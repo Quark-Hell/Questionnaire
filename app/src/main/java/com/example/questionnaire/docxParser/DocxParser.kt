@@ -1,17 +1,17 @@
-package com.example.questionnaire
+package com.example.questionnaire.docxParser
 
 import android.content.Context
 import android.net.Uri
+import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
 import org.apache.poi.xwpf.usermodel.XWPFDocument
 
-@QuestionItem.Parcelize
+@Parcelize
 data class QuestionItem(
     val question: String,
-    val answers: List<String>,
+    val answers: List<String> = emptyList(),
     val correctAnswerIndex: Int // -1 если правильный ответ не найден
-) {
-    annotation class Parcelize
-}
+) : Parcelable
 
 fun String.normalizeDocx(): String =
     this
