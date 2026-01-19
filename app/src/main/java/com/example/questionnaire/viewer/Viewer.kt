@@ -90,6 +90,7 @@ open class ViewerViewModel : ViewModel() {
         if (mimeType == "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
             val parsed = DocxParser.parse(uri, context)
             mainViewModel.setQuestions(parsed, name)
+            mainViewModel.saveQuestionsToDatabase(mainViewModel.mainState.value.questionsList);
             return null
         }
         return "Выберите файл .docx" // show error

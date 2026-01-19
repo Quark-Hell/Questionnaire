@@ -2,9 +2,7 @@ package com.example.questionnaire.docxParser
 
 import android.content.Context
 import android.net.Uri
-import android.os.Parcelable
 import com.example.questionnaire.models.QuestionModel
-import kotlinx.parcelize.Parcelize
 import org.apache.poi.xwpf.usermodel.XWPFDocument
 
 fun String.normalizeDocx(): String =
