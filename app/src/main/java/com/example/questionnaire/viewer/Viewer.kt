@@ -7,29 +7,32 @@ import android.widget.Toast
 import androidx.activity.compose.ManagedActivityResultLauncher
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -41,30 +44,31 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.dropShadow
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.questionnaire.docxParser.QuestionItem
+import com.example.questionnaire.components.QuestionCard
+
+
 import com.example.questionnaire.main.LocalAppColors
 import com.example.questionnaire.main.MainViewModel
-import com.example.questionnaire.main.bottomShadow
+import com.example.questionnaire.main.TopBarItem
+import com.example.questionnaire.models.ViewerModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.update
-
-data class ViewerModel (
-    val questionCount: Int = 0,
-    val selectedQuestion: Int? = null
-)
 
 open class ViewerViewModel : ViewModel() {
     private val _viewerState = MutableStateFlow(ViewerModel())
@@ -92,13 +96,22 @@ open class ViewerViewModel : ViewModel() {
     }
 }
 
+fun getFileName(context: Context, uri: Uri): String? {
+    val cursor = context.contentResolver.query(uri, null, null, null, null)
+    cursor?.use {
+        val nameIndex = it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+        if (it.moveToFirst()) return it.getString(nameIndex)
+    }
+    return uri.lastPathSegment
+}
+
 @Composable
-fun DocumentPickerScreen(
+fun QuestionsScreen(
     mainViewModel: MainViewModel,
     viewerViewModel: ViewerViewModel
 ) {
-    val mainState = mainViewModel.mainState.collectAsState().value
-    val viewerState = viewerViewModel.viewerState.collectAsState().value
+    mainViewModel.setTopBar(listOf(TopBarItem.Search))
+
     val context = LocalContext.current
 
     val launcher = rememberLauncherForActivityResult(
@@ -115,7 +128,7 @@ fun DocumentPickerScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(top = 10.dp),
+            .padding(top = 16.dp),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -125,13 +138,11 @@ fun DocumentPickerScreen(
         ) {
             QuestionNavigator(
                 mainViewModel,
-                viewerViewModel,
-                modifier = Modifier.fillMaxWidth()
+                viewerViewModel
             )
 
         }
     }
-
 
     FilePickerButton(launcher)
 }
@@ -155,7 +166,7 @@ fun FilePickerButton(launcher: ManagedActivityResultLauncher<Array<String>, Uri?
             Icon(
                 imageVector = Icons.Rounded.Add,
                 contentDescription = "Add",
-                tint = appColors.fill,
+                tint = appColors.thirdBackground,
                 modifier = Modifier
                     .fillMaxSize(0.7f)
             )
@@ -166,8 +177,7 @@ fun FilePickerButton(launcher: ManagedActivityResultLauncher<Array<String>, Uri?
 @Composable
 fun QuestionNavigator(
     mainViewModel: MainViewModel,
-    viewerViewModel: ViewerViewModel,
-    modifier: Modifier
+    viewerViewModel: ViewerViewModel
 ) {
     val mainState by mainViewModel.mainState.collectAsState()
     val viewerViewModel by viewerViewModel.viewerState.collectAsState()
@@ -189,102 +199,145 @@ fun QuestionNavigator(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         itemsIndexed(mainState.questionsList) { index, item ->
-            QuestionItemView(
+            val selectedModifier = if (index == viewerViewModel.selectedQuestion) {
+                Modifier.dropShadow(
+                    shape = RoundedCornerShape(4.dp),
+                    shadow = Shadow(
+                        radius = 4.dp,
+                        spread = 0.dp,
+                        color = Color(0x60000000),
+                        offset = DpOffset(x = 4.dp, y = 4.dp)
+                    )
+                )
+            } else {
+                Modifier
+            }
+
+            QuestionCard(
                 questionIndex = index,
                 questionItem = item,
-                isCurrent = index == viewerViewModel.selectedQuestion
+                selectedModifier
             )
         }
+    }
+}
+
+private fun jumpToQuestion(
+    value: String,
+    questionsCount: Int,
+    viewerViewModel: ViewerViewModel
+) {
+    val index = value.toIntOrNull()?.minus(1)
+
+    if (index != null && index in 0 until questionsCount) {
+        viewerViewModel.selectQuestion(index)
+    } else {
+        viewerViewModel.selectQuestion(null)
     }
 }
 
 @Composable
-fun QuestionItemView(
-    questionIndex: Int,
-    questionItem: QuestionItem,
-    isCurrent: Boolean
+fun SearchBar(
+    mainViewModel: MainViewModel,
+    viewerViewModel: ViewerViewModel
 ) {
+    val mainState by mainViewModel.mainState.collectAsState()
+
     val appColors = LocalAppColors.current
 
-    Column(
-        modifier = Modifier
-            .then(
-                if (isCurrent) Modifier.dropShadow(
-                    shape = RoundedCornerShape(20.dp),
-                    shadow = Shadow(
-                        radius = 10.dp,
-                        spread = 2.dp,
-                        color = Color(0x40000000),
-                        offset = DpOffset(x = 2.dp, 2.dp)
-                    )
-                )
-                else Modifier
-            )
-            .clip(RoundedCornerShape(4.dp))
-            .background(
-                color = appColors.thirdBackground,
-            )
+    var searchValue by remember { mutableStateOf("") }
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
 
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(appColors.secondaryBackground)
-                .dropShadow(
-                    shape = RoundedCornerShape(10.dp),
-                    shadow = Shadow(
-                        radius = 8.dp,
-                        spread = 0.dp,
-                        color = Color(0x30000000),
-                        offset = DpOffset(x = 0.dp, 2.dp)
-                    )
-                )
-                .padding(horizontal = 16.dp)
-                .padding(vertical = 10.dp)
-        ) {
-            Text(
-                text = "${questionIndex + 1}. ${questionItem.question}",
-                style = MaterialTheme.typography.titleMedium,
-                color = appColors.secondaryText
-            )
+    var isSearchPressed by remember { mutableStateOf(false) }
+    val searchIconScale by animateFloatAsState(
+        targetValue = if (isSearchPressed) 0.85f else 1f,
+        animationSpec = tween(250),
+        label = "SearchIconScale"
+    )
+
+    var isSearchFocused by remember { mutableStateOf(false) }
+    val searchState = rememberTextFieldState(searchValue)
+
+    LaunchedEffect(isSearchPressed) {
+        if (isSearchPressed) {
+            delay(250)
+            isSearchPressed = false
         }
-        Column(
-            modifier = Modifier
-                .padding(horizontal = 10.dp)
-                .padding(vertical = 10.dp)
-        ){
-            Spacer(modifier = Modifier.height(4.dp))
+    }
 
-            questionItem.answers.forEachIndexed { index, answer ->
-                val isCorrect = index == questionItem.correctAnswerIndex
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(
-                            color = if (isCorrect) appColors.highlights else Color.Transparent,
-                            shape = RoundedCornerShape(4.dp)
-                        )
-                        .padding(horizontal = 6.dp)
-                ) {
-                    Text(
-                        text = "${index + 1}. $answer",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = appColors.standardText
+    OutlinedTextField(
+        state = searchState,
+        contentPadding = PaddingValues(horizontal = 15.dp, vertical = 10.dp),
+        shape = RoundedCornerShape(100.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedContainerColor = appColors.thirdBackground,
+            unfocusedContainerColor = appColors.thirdBackground,
+            focusedBorderColor = Color.Transparent,
+            unfocusedBorderColor = Color.Transparent,
+            focusedTextColor = appColors.black,
+            unfocusedTextColor = appColors.gray,
+            focusedTrailingIconColor = appColors.black,
+            unfocusedTrailingIconColor = appColors.gray,
+        ),
+        trailingIcon = {
+            IconButton(
+                onClick = {
+                    isSearchPressed = true
+                    jumpToQuestion(
+                        searchState.text.toString(),
+                        mainState.questionsList.size,
+                        viewerViewModel
                     )
+                    searchState.edit {
+                        replace(0, length, "")
+                    }
+                    focusManager.clearFocus()
+                },
+                modifier = Modifier.graphicsLayer {
+                    scaleX = searchIconScale
+                    scaleY = searchIconScale
                 }
-
-                Spacer(modifier = Modifier.height(4.dp))
+            ) {
+                Icon(Icons.Default.Search, contentDescription = "Search icon")
             }
-        }
-    }
-}
-
-fun getFileName(context: Context, uri: Uri): String? {
-    val cursor = context.contentResolver.query(uri, null, null, null, null)
-    cursor?.use {
-        val nameIndex = it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-        if (it.moveToFirst()) return it.getString(nameIndex)
-    }
-    return uri.lastPathSegment
+        },
+        textStyle = TextStyle(
+            fontSize = 18.sp,
+            lineHeight = 14.sp,
+            color = appColors.black
+        ),
+        placeholder = {
+            if (!isSearchFocused) {
+                Text(
+                    "Search",
+                    fontSize = 14.sp,
+                    lineHeight = 24.sp,
+                    color = appColors.thirdText
+                )
+            }
+        },
+        keyboardOptions = KeyboardOptions(
+            imeAction = ImeAction.Search
+        ),
+        onKeyboardAction = {
+            jumpToQuestion(
+                searchState.text.toString(),
+                mainState.questionsList.size,
+                viewerViewModel
+            )
+            searchState.edit {
+                replace(0, length, "")
+            }
+            focusManager.clearFocus()
+            keyboardController?.hide()
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 6.dp)
+            .height(45.dp)
+            .onFocusChanged { focusState ->
+                isSearchFocused = focusState.isFocused
+            },
+    )
 }

@@ -1,65 +1,51 @@
 package com.example.questionnaire.main
 
+import android.app.Application
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.runtime.Composable
+
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModel
+
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.foundation.background
+
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.graphics.Color
+
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.*
+
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Quiz
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.StackedLineChart
-import androidx.compose.material3.*
+
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.drawWithContent
+
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.graphics.Color
+
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.Dp
 
-import com.example.questionnaire.docxParser.QuestionItem
+import com.example.questionnaire.models.QuestionModel
 import com.example.questionnaire.tester.TesterViewModel
 import com.example.questionnaire.ui.theme.QuestionnaireTheme
 import com.example.questionnaire.resulter.ResultsScreen
 import com.example.questionnaire.resulter.ResultsViewModel
-import com.example.questionnaire.tester.TestSettingsScreen
-import com.example.questionnaire.viewer.DocumentPickerScreen
+import com.example.questionnaire.tester.TesterScreen
+import com.example.questionnaire.viewer.QuestionsScreen
 import com.example.questionnaire.viewer.ViewerViewModel
+import com.example.questionnaire.viewer.SearchBar
 
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -76,12 +62,17 @@ data class AppColorScheme (
     val secondaryBackground: Color,
     val thirdBackground: Color,
 
-    val standardText: Color,
-    val secondaryText: Color,
+    val black: Color,
+    val whiteText: Color,
     val thirdText: Color,
 
-    val fill: Color,
+    val gray: Color,
+    val red: Color,
+    val green: Color,
+
     val highlights: Color,
+    val focused: Color,
+    val error: Color,
 )
 
 val LocalAppColors = staticCompositionLocalOf<AppColorScheme> {
@@ -99,12 +90,17 @@ fun AppTheme(content: @Composable () -> Unit) {
         secondaryBackground = Color(0xFF3D2B27),
         thirdBackground = Color(0xFFFFFFFF),
 
-        standardText = Color(0xFF000000),
-        secondaryText = Color(0xFFF5F0EA),
+        whiteText = Color(0xFFF5F0EA),
         thirdText = Color(0xFFD4C2B6),
 
-        fill = Color(0xFFFFFFFF),
-        highlights = Color(0xFFE9D6B1)
+        black = Color(0xFF000000),
+        gray = Color(0xFF49454F),
+        red = Color(0xFFAA4861),
+        green = Color(0xFF839958),
+
+        highlights = Color(0xFFE9D6B1),
+        focused = Color(0xFF9E8D83),
+        error = Color(0xFF900000)
     )
 
     CompositionLocalProvider(LocalAppColors provides appColors) {
@@ -112,11 +108,9 @@ fun AppTheme(content: @Composable () -> Unit) {
     }
 }
 
-data class ThemeColors (
-    val whiteTheme: AppColorScheme,
-    val blackTheme: AppColorScheme,
-    val isWhiteTheme: Boolean = true
-)
+sealed class TopBarItem {
+    object Search : TopBarItem()
+}
 
 sealed class Screen {
     object StartScreen : Screen()
@@ -126,24 +120,82 @@ sealed class Screen {
 
 data class MainModel (
     var currentScreen: Screen = Screen.StartScreen,
-    val questionsList: List<QuestionItem> = emptyList(),
-    val questionCount: Int = 0,
+    val questionsList: List<QuestionModel> = emptyList(),
+    val topBarItems: List<TopBarItem> = emptyList(),
     val fileName: String? = null,
 )
 
-open class MainViewModel : ViewModel() {
+open class MainViewModel () : ViewModel() {
+    val testQuestions = listOf(
+        QuestionModel(
+            question = "Какой язык используется для разработки под Android?",
+            answers = listOf(
+                "Kotlin",
+                "Swift",
+                "JavaScript",
+                "Python"
+            ),
+            correctAnswerIndex = 0
+        ),
+        QuestionModel(
+            question = "Какой компонент используется для компоновки элементов по горизонтали в Compose?",
+            answers = listOf(
+                "Column",
+                "Box",
+                "Row",
+                "LazyColumn"
+            ),
+            correctAnswerIndex = 2
+        ),
+        QuestionModel(
+            question = "Что такое ViewModel в Android?",
+            answers = listOf(
+                "UI-компонент",
+                "Класс для хранения состояния экрана",
+                "Сервис Android",
+                "База данных"
+            ),
+            correctAnswerIndex = 1
+        ),
+        QuestionModel(
+            question = "Какой метод используется для подписки на StateFlow в Compose?",
+            answers = listOf(
+                "collect()",
+                "observe()",
+                "collectAsState()",
+                "subscribe()"
+            ),
+            correctAnswerIndex = 2
+        )
+    )
     private val _mainState = MutableStateFlow(MainModel())
     val mainState: StateFlow<MainModel> = _mainState
+
+    init {
+        setQuestions(
+            questions = testQuestions,
+            fileName = "test_questions"
+        )
+    }
+
+    fun setTopBar(items: List<TopBarItem>) {
+        _mainState.update {
+            it.copy(topBarItems = items)
+        }
+    }
+
+    fun clearTopBar() {
+        setTopBar(emptyList())
+    }
 
     fun navigateTo(screen: Screen) {
         _mainState.value = _mainState.value.copy(currentScreen = screen)
     }
 
-    fun setQuestions(questions: List<QuestionItem>, fileName: String?) {
+    fun setQuestions(questions: List<QuestionModel>, fileName: String?) {
         _mainState.update { current ->
             current.copy(
                 questionsList = questions,
-                questionCount = questions.size,
                 fileName = fileName
             )
         }
@@ -152,7 +204,7 @@ open class MainViewModel : ViewModel() {
 
 class MainActivity : ComponentActivity() {
     private val mainViewModel: MainViewModel by viewModels()
-    private  val viewerViewModel: ViewerViewModel by viewModels()
+    private val viewerViewModel: ViewerViewModel by viewModels()
     private val testerViewModel: TesterViewModel by viewModels()
     private val resultsViewModel: ResultsViewModel by viewModels()
 
@@ -174,28 +226,6 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun MainScreenPreview() {
-    val fakeMainViewModel = object : MainViewModel() {
-    }
-    val fakeViewerViewModel = object : ViewerViewModel() {
-    }
-    val fakeTesterViewModel = object : TesterViewModel() {
-    }
-
-    val fakeResultsViewModel = object : ResultsViewModel() {
-    }
-
-
-    MainScreen(
-        mainViewModel = fakeMainViewModel,
-        fakeViewerViewModel,
-        fakeTesterViewModel,
-        fakeResultsViewModel
-    )
 }
 
 @Composable
@@ -230,40 +260,30 @@ fun MainScreen(
                     }
                 )
 
+                //Switch screen
                 Box(modifier = Modifier.weight(1f)) {
                     when (mainState.currentScreen) {
-                        Screen.StartScreen -> DocumentPickerScreen(
+                        Screen.StartScreen -> QuestionsScreen(
                             mainViewModel = mainViewModel,
                             viewerViewModel = viewerViewModel
                         )
 
-                        Screen.TestScreen -> TestSettingsScreen(
+                        Screen.TestScreen -> TesterScreen(
                             mainViewModel = mainViewModel,
-                            testerViewModel = testerViewModel
+                            testerViewModel = testerViewModel,
+                            resulterViewModel = resultsViewModel
                         )
 
-                        Screen.ResultsScreen -> ResultsScreen(resultModel = resultsViewModel)
+                        Screen.ResultsScreen -> ResultsScreen(
+                            mainViewModel = mainViewModel,
+                            resultViewModel = resultsViewModel
+                        )
                     }
                 }
             }
         }
     }
 }
-
-private fun jumpToQuestion(
-    value: String,
-    questionsCount: Int,
-    viewerViewModel: ViewerViewModel
-) {
-    val index = value.toIntOrNull()?.minus(1)
-
-    if (index != null && index in 0 until questionsCount) {
-        viewerViewModel.selectQuestion(index)
-    } else {
-        viewerViewModel.selectQuestion(null)
-    }
-}
-
 
 @Composable
 fun TopPanel(
@@ -273,14 +293,12 @@ fun TopPanel(
     modifier: Modifier = Modifier
 ){
     val mainState by mainViewModel.mainState.collectAsState()
-    val viewerState by viewerViewModel.viewerState.collectAsState()
-
     val appColors = LocalAppColors.current
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(80.dp)
+            .height(70.dp)
             .background(appColors.secondaryBackground)
     ){
         Row(
@@ -297,64 +315,21 @@ fun TopPanel(
                 Icon(
                     imageVector = Icons.Default.Menu,
                     contentDescription = "Menu",
-                    tint = appColors.fill,
+                    tint = appColors.thirdBackground,
                     modifier = Modifier.size(60.dp)
-
                 )
             }
 
-            var searchValue by remember { mutableStateOf("") }
-            val keyboardController = LocalSoftwareKeyboardController.current
-            val focusManager = LocalFocusManager.current
-
-            OutlinedTextField(
-                value = searchValue,
-                onValueChange = { searchValue = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 6.dp)
-                    .height(56.dp),
-                trailingIcon = {
-                    IconButton(onClick = {
-                        jumpToQuestion(searchValue, mainState.questionsList.size, viewerViewModel)
-                        focusManager.clearFocus()
-                        searchValue = ""
-                    }) {
-                        Icon(Icons.Default.Search, contentDescription = "Search icon")
-                    }
-                },
-                placeholder = { Text("Search", fontSize = 14.sp) },
-                singleLine = true,
-                shape = RoundedCornerShape(100.dp),
-                keyboardOptions = KeyboardOptions(
-                    imeAction = ImeAction.Search
-                ),
-                keyboardActions = KeyboardActions(
-                    onSearch = {
-                        jumpToQuestion(
-                            searchValue,
-                            mainState.questionsList.size,
-                            viewerViewModel
+            mainState.topBarItems.forEach { item ->
+                when (item) {
+                    TopBarItem.Search -> {
+                        SearchBar(
+                            mainViewModel = mainViewModel,
+                            viewerViewModel = viewerViewModel
                         )
-                        searchValue = ""
-                        focusManager.clearFocus()
-
-                        keyboardController?.hide()
                     }
-                ),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = appColors.fill,
-                    unfocusedContainerColor = appColors.fill,
-
-                    unfocusedBorderColor = appColors.fill,
-
-                    focusedTextColor = appColors.standardText,
-                    unfocusedTextColor = appColors.highlights,
-
-                    focusedTrailingIconColor = appColors.standardText,
-                    unfocusedTrailingIconColor = appColors.highlights,
-                )
-            )
+                }
+            }
         }
     }
 }
@@ -411,7 +386,7 @@ fun SidePanel(
             ""
 
         else
-            mainState.questionCount.toString()
+            mainState.questionsList.size.toString()
 
 
     ModalNavigationDrawer(
@@ -434,7 +409,6 @@ fun SidePanel(
                         color = appColors.thirdText,
                         modifier = Modifier
                             .padding(horizontal = 16.dp)
-
                     )
 
                     Box(
@@ -471,7 +445,6 @@ fun SidePanel(
                         selected = false,
                         onClick =
                             {
-
                                 mainViewModel.navigateTo(Screen.TestScreen)
                                 scope.launch {
                                     drawerState.close()
@@ -485,7 +458,13 @@ fun SidePanel(
                         contentDescription = "Результаты",
                         label = "Результаты",
                         selected = false,
-                        onClick = { /* действие */ },
+                        onClick =
+                            {
+                                mainViewModel.navigateTo(Screen.ResultsScreen)
+                                scope.launch {
+                                    drawerState.close()
+                                }
+                            },
                         modifier = Modifier.height(55.dp)
                     )
 
