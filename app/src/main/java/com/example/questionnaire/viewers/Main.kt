@@ -1,13 +1,4 @@
-package com.example.questionnaire.main
-
-import androidx.room.Room
-import androidx.room.RoomDatabase
-
-import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
-import androidx.activity.viewModels
+package com.example.questionnaire.viewers
 
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModel
@@ -39,28 +30,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.viewModelScope
 
-import com.example.questionnaire.dataBase.AppDatabase
 import com.example.questionnaire.dataBase.QuestionRepository
 
 import com.example.questionnaire.models.QuestionModel
-import com.example.questionnaire.models.QuestionEntity
+import com.example.questionnaire.viewModels.CardsViewModel
 
-import com.example.questionnaire.tester.TesterViewModel
-import com.example.questionnaire.ui.theme.QuestionnaireTheme
-import com.example.questionnaire.resulter.ResultsScreen
-import com.example.questionnaire.resulter.ResultsViewModel
-import com.example.questionnaire.tester.TesterScreen
-import com.example.questionnaire.viewer.QuestionsScreen
-import com.example.questionnaire.viewer.ViewerViewModel
-import com.example.questionnaire.viewer.SearchBar
+import com.example.questionnaire.viewModels.MainViewModel
+import com.example.questionnaire.viewModels.ResultsViewModel
+import com.example.questionnaire.viewModels.TesterViewModel
+import com.example.questionnaire.viewModels.ViewerViewModel
 
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlin.getValue
 
 data class AppColorScheme (
     val buttonDefault: Color,
@@ -125,6 +106,7 @@ sealed class Screen {
     object StartScreen : Screen()
     object TestScreen : Screen()
     object ResultsScreen : Screen()
+    object CardsScreen : Screen()
 }
 
 data class MainModel (
@@ -133,124 +115,6 @@ data class MainModel (
     val topBarItems: List<TopBarItem> = emptyList(),
     val fileName: String? = null,
 )
-
-class MainViewModel(
-    private val repository: QuestionRepository
-) : ViewModel() {
-
-    private fun loadSaves() {
-        viewModelScope.launch {
-            try {
-                val questionsFromDb = repository.getQuestions()
-
-                if (questionsFromDb.isNotEmpty()) {
-                    // Конвертируем Entity в Model
-                    val questions = questionsFromDb.map { entity ->
-                        QuestionModel(
-                            question = entity.question,
-                            answers = entity.answers,
-                            correctAnswerIndex = entity.correctAnswerIndex
-                        )
-                    }
-                    setQuestions(questions, "loaded_from_db")
-                } else {
-                    loadTestQuestions()
-                }
-            } catch (e: Exception) {
-                loadTestQuestions()
-            }
-        }
-    }
-
-    private fun loadTestQuestions() {
-        val testQuestions = listOf(
-            QuestionModel(
-                question = "Какой язык используется для разработки под Android?",
-                answers = listOf("Kotlin", "Swift", "JavaScript", "Python"),
-                correctAnswerIndex = 0
-            ),
-            QuestionModel(
-                question = "Какой компонент используется для компоновки элементов по горизонтали в Compose?",
-                answers = listOf("Column", "Box", "Row", "LazyColumn"),
-                correctAnswerIndex = 2
-            ),
-            QuestionModel(
-                question = "Что такое ViewModel в Android?",
-                answers = listOf(
-                    "UI-компонент",
-                    "Класс для хранения состояния экрана",
-                    "Сервис Android",
-                    "База данных"
-                ),
-                correctAnswerIndex = 1
-            ),
-            QuestionModel(
-                question = "Какой метод используется для подписки на StateFlow в Compose?",
-                answers = listOf("collect()", "observe()", "collectAsState()", "subscribe()"),
-                correctAnswerIndex = 2
-            )
-        )
-
-        setQuestions(testQuestions, "test_questions")
-    }
-
-    fun saveQuestionsToDatabase(questions: List<QuestionModel>) {
-        viewModelScope.launch {
-            try {
-                val entities = questions.map { model ->
-                    QuestionEntity(
-                        question = model.question,
-                        answers = model.answers,
-                        correctAnswerIndex = model.correctAnswerIndex
-                    )
-                }
-                repository.insertQuestions(entities)
-            } catch (e: Exception) {
-
-            }
-        }
-    }
-
-    fun clearDatabase() {
-        viewModelScope.launch {
-            try {
-                repository.clearQuestions()
-            } catch (e: Exception) {
-
-            }
-        }
-    }
-
-    private val _mainState = MutableStateFlow(MainModel())
-    val mainState: StateFlow<MainModel> = _mainState
-
-    init {
-        loadSaves()
-    }
-
-    fun setTopBar(items: List<TopBarItem>) {
-        _mainState.update {
-            it.copy(topBarItems = items)
-        }
-    }
-
-    fun clearTopBar() {
-        setTopBar(emptyList())
-    }
-
-    fun navigateTo(screen: Screen) {
-        _mainState.value = _mainState.value.copy(currentScreen = screen)
-    }
-
-    fun setQuestions(questions: List<QuestionModel>, fileName: String?) {
-        _mainState.update { current ->
-            current.copy(
-                questionsList = questions,
-                fileName = fileName
-            )
-        }
-    }
-}
 
 class AppViewModelFactory(
     private val repository: QuestionRepository
@@ -271,62 +135,13 @@ class AppViewModelFactory(
         }
 }
 
-
-class MainActivity : ComponentActivity() {
-    val database: AppDatabase by lazy {
-        Room.databaseBuilder(
-            applicationContext,
-            AppDatabase::class.java,
-            "questionnaire_db" // имя базы
-        )
-            .fallbackToDestructiveMigration() // ⬅ позволяет Room удалять старую БД при изменении схемы
-            .build()
-    }
-
-    private val repository by lazy {
-        QuestionRepository(
-            questionDao = database.questionDao(),
-            testResultDao = database.testResultDao(),
-        )
-    }
-
-    private val factory by lazy {
-        AppViewModelFactory(repository)
-    }
-
-    private val mainViewModel: MainViewModel by viewModels { factory }
-
-    private val testerViewModel: TesterViewModel by viewModels()
-
-    private val viewerViewModel: ViewerViewModel by viewModels()
-    private val resultsViewModel: ResultsViewModel by viewModels { factory }
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-
-        setContent {
-            QuestionnaireTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    MainScreen(
-                        mainViewModel = mainViewModel,
-                        viewerViewModel = viewerViewModel,
-                        testerViewModel = testerViewModel,
-                        resultsViewModel = resultsViewModel,
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
-            }
-        }
-    }
-}
-
 @Composable
 fun MainScreen(
     mainViewModel: MainViewModel,
     viewerViewModel: ViewerViewModel,
     testerViewModel: TesterViewModel,
     resultsViewModel: ResultsViewModel,
+    cardsViewModel: CardsViewModel,
     modifier: Modifier = Modifier
 ) {
     AppTheme {
@@ -370,6 +185,11 @@ fun MainScreen(
                         Screen.ResultsScreen -> ResultsScreen(
                             mainViewModel = mainViewModel,
                             resultViewModel = resultsViewModel
+                        )
+
+                        Screen.CardsScreen -> Cards(
+                            mainViewModel = mainViewModel,
+                            cardsViewModel = cardsViewModel
                         )
                     }
                 }
@@ -554,6 +374,21 @@ fun SidePanel(
                         onClick =
                             {
                                 mainViewModel.navigateTo(Screen.ResultsScreen)
+                                scope.launch {
+                                    drawerState.close()
+                                }
+                            },
+                        modifier = Modifier.height(55.dp)
+                    )
+
+                    SidePanelButton(
+                        imageVector = Icons.Default.Quiz,
+                        contentDescription = "Карточки",
+                        label = "Карточки",
+                        selected = false,
+                        onClick =
+                            {
+                                mainViewModel.navigateTo(Screen.CardsScreen)
                                 scope.launch {
                                     drawerState.close()
                                 }

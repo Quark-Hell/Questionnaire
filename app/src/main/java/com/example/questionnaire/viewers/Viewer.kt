@@ -1,4 +1,4 @@
-package com.example.questionnaire.viewer
+package com.example.questionnaire.viewers
 
 import android.content.Context
 import android.net.Uri
@@ -36,10 +36,6 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.lifecycle.ViewModel
-import com.example.questionnaire.docxParser.DocxParser
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -60,42 +56,13 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.questionnaire.components.FilePickerButton
 import com.example.questionnaire.components.QuestionCard
 
 
-import com.example.questionnaire.main.LocalAppColors
-import com.example.questionnaire.main.MainViewModel
-import com.example.questionnaire.main.TopBarItem
-import com.example.questionnaire.models.ViewerModel
+import com.example.questionnaire.viewModels.MainViewModel
+import com.example.questionnaire.viewModels.ViewerViewModel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.update
-
-open class ViewerViewModel : ViewModel() {
-    private val _viewerState = MutableStateFlow(ViewerModel())
-    val viewerState: StateFlow<ViewerModel> = _viewerState
-
-    fun selectQuestion(index: Int?) {
-        _viewerState.update { current ->
-            current.copy(selectedQuestion = index)
-        }
-    }
-
-    fun handleDocument(
-        uri: Uri,
-        context: Context,
-        mainViewModel: MainViewModel
-    ): String? {
-        val name = getFileName(context, uri)
-        val mimeType = context.contentResolver.getType(uri)
-        if (mimeType == "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
-            val parsed = DocxParser.parse(uri, context)
-            mainViewModel.setQuestions(parsed, name)
-            mainViewModel.saveQuestionsToDatabase(mainViewModel.mainState.value.questionsList);
-            return null
-        }
-        return "Выберите файл .docx" // show error
-    }
-}
 
 fun getFileName(context: Context, uri: Uri): String? {
     val cursor = context.contentResolver.query(uri, null, null, null, null)
@@ -147,34 +114,6 @@ fun QuestionsScreen(
 
     FilePickerButton(launcher)
 }
-
-@Composable
-fun FilePickerButton(launcher: ManagedActivityResultLauncher<Array<String>, Uri?>) {
-    val appColors = LocalAppColors.current
-
-    Box(
-        modifier = Modifier.fillMaxSize()
-    ) {
-        FloatingActionButton(
-            onClick = { launcher.launch(arrayOf("application/*")) },
-            shape = RoundedCornerShape(20.dp),
-            containerColor = appColors.secondaryBackground,
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(26.dp)
-                .size(60.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.Add,
-                contentDescription = "Add",
-                tint = appColors.thirdBackground,
-                modifier = Modifier
-                    .fillMaxSize(0.7f)
-            )
-        }
-    }
-}
-
 @Composable
 fun QuestionNavigator(
     mainViewModel: MainViewModel,

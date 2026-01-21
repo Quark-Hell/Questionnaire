@@ -18,7 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
-import com.example.questionnaire.main.LocalAppColors
+import com.example.questionnaire.viewers.LocalAppColors
 import com.example.questionnaire.models.QuestionModel
 
 @Composable
