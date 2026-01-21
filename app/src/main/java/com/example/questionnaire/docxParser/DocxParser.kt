@@ -1,17 +1,9 @@
-package com.example.questionnaire
+package com.example.questionnaire.docxParser
 
 import android.content.Context
 import android.net.Uri
+import com.example.questionnaire.models.QuestionModel
 import org.apache.poi.xwpf.usermodel.XWPFDocument
-
-@QuestionItem.Parcelize
-data class QuestionItem(
-    val question: String,
-    val answers: List<String>,
-    val correctAnswerIndex: Int // -1 если правильный ответ не найден
-) {
-    annotation class Parcelize
-}
 
 fun String.normalizeDocx(): String =
     this
@@ -32,8 +24,8 @@ class DocxParser {
          * - 3-4 строки с вариантами (правильный вариант заканчивается "(+)" или "+" )
          * - пустая строка = конец вопроса
          */
-        fun parse(uri: Uri, context: Context): List<QuestionItem> {
-            val questions = mutableListOf<QuestionItem>()
+        fun parse(uri: Uri, context: Context): List<QuestionModel> {
+            val questions = mutableListOf<QuestionModel>()
 
             try {
                 context.contentResolver.openInputStream(uri)?.use { stream ->
@@ -82,7 +74,7 @@ class DocxParser {
                         // Сохраняем вопрос даже если правильный ответ не найден
                         if (answers.isNotEmpty()) {
                             questions.add(
-                                QuestionItem(
+                                QuestionModel(
                                     question = questionText,
                                     answers = answers.toList(),
                                     correctAnswerIndex = correctIndex // -1 если не найдено
