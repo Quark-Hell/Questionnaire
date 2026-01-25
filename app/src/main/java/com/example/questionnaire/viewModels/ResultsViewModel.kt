@@ -79,10 +79,10 @@ class ResultsViewModel(
                     }
                     setTestResults(results)
                 } else {
-                    loadTestResults()
+                    //loadTestResults()
                 }
             } catch (e: Exception) {
-                loadTestResults()
+                //loadTestResults()
             }
         }
     }
@@ -136,12 +136,20 @@ class ResultsViewModel(
     }
 
 
+    private val _viewedResultState = MutableStateFlow(TestResult())
+    val viewedResultState: StateFlow<TestResult> = _viewedResultState
 
     private val _resulterState = MutableStateFlow(AllTestResult())
     val resulterState: StateFlow<AllTestResult> = _resulterState
 
     init {
         loadSaves()
+    }
+
+    fun setViewedTestResult (testResult: TestResult) {
+        _viewedResultState.update { _ ->
+            testResult
+        }
     }
 
     private fun setTestResults(testResults: List<TestResult>){

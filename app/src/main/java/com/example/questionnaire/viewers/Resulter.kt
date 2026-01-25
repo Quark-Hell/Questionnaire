@@ -85,6 +85,7 @@ fun ResultsScreen(
     val appColors = LocalAppColors.current
 
     var currentScreen: ResultsSubScreen by remember { mutableStateOf(ResultsSubScreen.ResultsListScreen) }
+    var viewedTestResult by remember { mutableStateOf(TestResult()) }
 
     Box() {
         when(currentScreen) {
@@ -141,7 +142,10 @@ fun ResultsList(
                 onExpandToggle = {
                     expandedCardIndex = if (expandedCardIndex == cardNumber) null else cardNumber
                 },
-                onOpened = onSwitchScreen
+                onOpened = {
+                    resultViewModel.setViewedTestResult(result)
+                    onSwitchScreen()
+                }
             )
         }
     }
@@ -155,8 +159,7 @@ fun ResultDescription(
 ) {
     val appColors = LocalAppColors.current
 
-    val testResults by resultViewModel.resulterState.collectAsState()
-    val resultItems = testResults.allTestResults.flatMap { it.testResults }
+    val resultItems by resultViewModel.viewedResultState.collectAsState()
 
     Box(
         modifier = Modifier
@@ -172,7 +175,7 @@ fun ResultDescription(
                 .padding(10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            itemsIndexed(resultItems) { index, result ->
+            itemsIndexed(resultItems.testResults) { index, result ->
                 ResultQuestionCard(
                     questionIndex = index,
                     questionItem = result
