@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.sp
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.HorizontalDivider
 
 import androidx.compose.ui.Alignment
 
@@ -29,6 +30,7 @@ import androidx.compose.ui.graphics.Color
 
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.lifecycle.ViewModelProvider
 
 import com.example.questionnaire.dataBase.QuestionRepository
@@ -310,45 +312,80 @@ fun SidePanel(
                 drawerContainerColor = appColors.secondaryBackground
             ) {
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    Spacer(
-                        modifier = Modifier
-                            .height(16.dp)
-                    )
-
-                    Text(
-                        text = "Меню",
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = appColors.thirdText,
-                        modifier = Modifier
-                            .padding(horizontal = 16.dp)
-                    )
-
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(16.dp)
-                            .bottomShadow(
-                                Color.Black.copy(alpha = 0.4f),
-                                2.dp
-                            )
-                    )
-
                     val scope = rememberCoroutineScope()
+                    val currentScreen = mainState.currentScreen
+
+                    Title(
+                        "Меню",
+                        24.sp,
+                        FontWeight.Bold,
+                        16.dp,
+                        16.dp
+                    )
 
                     SidePanelButton(
                         imageVector = Icons.Default.Home,
-                        contentDescription = "Главная",
-                        label = "Главная",
-                        selected = false,
+                        contentDescription = "Тест",
+                        label = "Обзор теста",
+                        selected = currentScreen == Screen.StartScreen,
                         onClick =
                             {
                                 mainViewModel.navigateTo(Screen.StartScreen)
                                 scope.launch {
                                     drawerState.close()
                                 }
-                            },
-                        modifier = Modifier.height(55.dp)
+                            }
+                    )
+
+                    SidePanelButton(
+                        imageVector = Icons.Default.Quiz,
+                        contentDescription = "Тестирование",
+                        label = "Тестирование",
+                        selected = currentScreen == Screen.TestScreen,
+                        onClick =
+                            {
+                                mainViewModel.navigateTo(Screen.TestScreen)
+                                scope.launch {
+                                    drawerState.close()
+                                }
+                            }
+                    )
+
+                    SidePanelButton(
+                        imageVector = Icons.Default.StackedLineChart,
+                        contentDescription = "Результаты",
+                        label = "Результаты",
+                        selected = currentScreen == Screen.ResultsScreen,
+                        onClick =
+                            {
+                                mainViewModel.navigateTo(Screen.ResultsScreen)
+                                scope.launch {
+                                    drawerState.close()
+                                }
+                            }
+                    )
+
+                    HorizontalDivider(
+                        modifier = Modifier
+                            .padding(top = 16.dp),
+                        thickness = 2.dp,
+                        color = Color.Black.copy(alpha = 0.2f)
+                    )
+
+                    /*
+
+                    SidePanelButton(
+                        imageVector = Icons.Default.Home,
+                        contentDescription = "Обзор карточек",
+                        label = "Обзор карточек",
+                        selected = currentScreen == Screen.CardsScreen,
+                        onClick =
+                            {
+                                mainViewModel.navigateTo(Screen.CardsScreen)
+                                scope.launch {
+                                    drawerState.close()
+                                }
+                            }
                     )
 
                     SidePanelButton(
@@ -358,12 +395,11 @@ fun SidePanel(
                         selected = false,
                         onClick =
                             {
-                                mainViewModel.navigateTo(Screen.TestScreen)
+                                mainViewModel.navigateTo(Screen.CardsScreen)
                                 scope.launch {
                                     drawerState.close()
                                 }
-                            },
-                        modifier = Modifier.height(55.dp)
+                            }
                     )
 
                     SidePanelButton(
@@ -373,36 +409,28 @@ fun SidePanel(
                         selected = false,
                         onClick =
                             {
-                                mainViewModel.navigateTo(Screen.ResultsScreen)
-                                scope.launch {
-                                    drawerState.close()
-                                }
-                            },
-                        modifier = Modifier.height(55.dp)
-                    )
-
-                    SidePanelButton(
-                        imageVector = Icons.Default.Quiz,
-                        contentDescription = "Карточки",
-                        label = "Карточки",
-                        selected = false,
-                        onClick =
-                            {
                                 mainViewModel.navigateTo(Screen.CardsScreen)
                                 scope.launch {
                                     drawerState.close()
                                 }
-                            },
-                        modifier = Modifier.height(55.dp)
+                            }
                     )
+
+                    HorizontalDivider(
+                        modifier = Modifier
+                            .padding(top = 16.dp),
+                        thickness = 2.dp,
+                        color = Color.Black.copy(alpha = 0.2f)
+                    )
+
+                     */
 
                     SidePanelButton(
                         imageVector = Icons.Default.Settings,
                         contentDescription = "Настройки",
                         label = "Настройки",
                         selected = false,
-                        onClick = { /* действие */ },
-                        modifier = Modifier.height(55.dp)
+                        onClick = { /* действие */ }
                     )
 
                     Spacer(modifier = Modifier.weight(1f))
@@ -447,37 +475,90 @@ fun SidePanel(
 }
 
 @Composable
+fun Title(
+    text: String,
+    fontSize: TextUnit,
+    fontWeight: FontWeight,
+    startPadding: Dp,
+    bottomPadding: Dp,
+) {
+    val appColors = LocalAppColors.current
+
+    Spacer(modifier = Modifier
+        .fillMaxWidth()
+        .height(startPadding)
+    )
+
+    Text(
+        text = text,
+        fontSize = fontSize,
+        fontWeight = fontWeight,
+        color = appColors.thirdText,
+        modifier = Modifier
+            .padding(horizontal = 16.dp)
+    )
+
+    HorizontalDivider(
+        modifier = Modifier
+            .padding(top = bottomPadding),
+        thickness = 2.dp,
+        color = Color.Black.copy(alpha = 0.2f)
+    )
+}
+
+@Composable
 fun SidePanelButton(
     imageVector: ImageVector,
     contentDescription: String? = null,
     label: String,
+    hasShadow: Boolean = true,
     selected: Boolean = false,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    onClick: () -> Unit
 ) {
     val appColors = LocalAppColors.current
 
-    NavigationDrawerItem(
-        icon = {
-            Icon(
-                imageVector = imageVector,
-                contentDescription = contentDescription
-            )
-        },
-        label = { Text(label) },
-        selected = selected,
-        onClick = onClick,
-        shape = RectangleShape,
-        colors = NavigationDrawerItemDefaults.colors(
-            selectedTextColor = appColors.thirdText,
-            unselectedTextColor = appColors.thirdText,
-            selectedIconColor = appColors.thirdText,
-            unselectedIconColor = appColors.thirdText,
-            selectedContainerColor = appColors.thirdBackground,
-            unselectedContainerColor = Color.Transparent
-        ),
-        modifier = modifier.bottomShadow(
-            Color.Black.copy(alpha = 0.2f)
+    Box(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        NavigationDrawerItem(
+            icon = {
+                Icon(
+                    imageVector = imageVector,
+                    contentDescription = contentDescription
+                )
+            },
+            label = { Text(label) },
+            selected = selected,
+            onClick = onClick,
+            shape = RectangleShape,
+            colors = NavigationDrawerItemDefaults.colors(
+                selectedTextColor = appColors.thirdText,
+                unselectedTextColor = appColors.thirdText,
+                selectedIconColor = appColors.thirdText,
+                unselectedIconColor = appColors.thirdText,
+                selectedContainerColor = Color.Transparent,
+                unselectedContainerColor = Color.Transparent
+            ),
+            modifier = Modifier
+                .then(
+                    if (hasShadow)
+                        Modifier.bottomShadow(Color.Black.copy(alpha = 0.2f))
+                    else
+                        Modifier
+                )
+                .height(55.dp)
         )
-    )
+
+        if (selected){
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .height(50.dp)
+                    .width(4.dp)
+                    .background(appColors.highlights)
+            )
+        }
+    }
+
+
 }

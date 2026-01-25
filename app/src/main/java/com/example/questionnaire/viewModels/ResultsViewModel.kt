@@ -18,8 +18,7 @@ class ResultsViewModel(
 ) : ViewModel() {
 
     private fun loadTestResults() {
-        val testData = TestResult(
-            testResults = listOf(
+            val testResults = listOf(
                 QuestionResult(
                     questionItem = QuestionModel(
                         question = "What is the capital of France?",
@@ -34,7 +33,7 @@ class ResultsViewModel(
                         answers = listOf("Earth", "Mars", "Jupiter", "Venus"),
                         correctAnswerIndex = 1
                     ),
-                    selectedAnswer = 0
+                    selectedAnswer = 0,
                 ),
                 QuestionResult(
                     questionItem = QuestionModel(
@@ -53,12 +52,11 @@ class ResultsViewModel(
                     selectedAnswer = 3
                 )
             )
-        )
 
-        addTestResults(testData)
-        addTestResults(testData)
-        addTestResults(testData)
-        addTestResults(testData)
+        addTestResults(testResults)
+        addTestResults(testResults)
+        addTestResults(testResults)
+        addTestResults(testResults)
     }
 
 
@@ -173,15 +171,5 @@ class ResultsViewModel(
         }
 
         saveResultsToDatabase(test);
-    }
-
-    private fun addTestResults(testResults: TestResult){
-        _resulterState.update { current ->
-            current.copy(
-                allTestResults = current.allTestResults + testResults
-            )
-        }
-
-        saveResultsToDatabase(testResults);
     }
 }

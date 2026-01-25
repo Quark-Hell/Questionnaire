@@ -7,6 +7,7 @@ import androidx.compose.animation.shrinkVertically
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -14,17 +15,24 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ArrowDropUp
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -43,10 +51,17 @@ import androidx.compose.runtime.setValue
 
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.rememberNestedScrollInteropConnection
+import com.example.questionnaire.components.ClassicButton
+import com.example.questionnaire.components.IconButton
 
 import com.example.questionnaire.components.QuestionCard
+import com.example.questionnaire.components.ResultQuestionCard
 
 import com.example.questionnaire.models.QuestionModel
+import com.example.questionnaire.models.QuestionResult
 import com.example.questionnaire.models.TestResult
 
 import com.example.questionnaire.viewModels.MainViewModel
@@ -55,6 +70,11 @@ import com.example.questionnaire.viewModels.ResultsViewModel
 import java.time.format.DateTimeFormatter
 import kotlin.collections.emptyList
 
+sealed class ResultsSubScreen {
+    object ResultsListScreen : ResultsSubScreen()
+    object WrongAnswerScreen : ResultsSubScreen()
+}
+
 @Composable
 fun ResultsScreen(
     mainViewModel: MainViewModel,
@@ -62,45 +82,26 @@ fun ResultsScreen(
 ) {
     mainViewModel.setTopBar(emptyList())
 
-    val testResults by resultViewModel.resulterState.collectAsState()
-    val resultItems = testResults.allTestResults
-
     val appColors = LocalAppColors.current
 
-    val listState = rememberLazyListState()
+    var currentScreen: ResultsSubScreen by remember { mutableStateOf(ResultsSubScreen.ResultsListScreen) }
 
-    LazyColumn(
-        state = listState,
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                color = appColors.standardBackground,
-            )
-            .padding(10.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        resultItems.asReversed().forEachIndexed { index, testResult ->
-            val cardNumber: Int = resultItems.size - index
-
-            item {
-                ResultCard(
-                    testResult = testResult,
-                    cardNumber = cardNumber
+    Box() {
+        when(currentScreen) {
+            ResultsSubScreen.ResultsListScreen -> {
+                ResultsList(
+                    mainViewModel,
+                    resultViewModel
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(appColors.highlights)
-                            .padding(4.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        testResult.testResults.forEachIndexed { questionIndex, questionResult ->
-                            WrongAnswer(
-                                questionIndex = questionIndex,
-                                questionItem = questionResult.questionItem
-                            )
-                        }
-                    }
+                    currentScreen = ResultsSubScreen.WrongAnswerScreen
+                }
+            }
+            ResultsSubScreen.WrongAnswerScreen -> {
+                ResultDescription(
+                    mainViewModel,
+                    resultViewModel
+                ) {
+                    currentScreen = ResultsSubScreen.ResultsListScreen
                 }
             }
         }
@@ -108,16 +109,96 @@ fun ResultsScreen(
 }
 
 @Composable
-fun ResultCard(
-    testResult: TestResult,
-    cardNumber: Int,
-    content: @Composable ColumnScope.() -> Unit
+fun ResultsList(
+    mainViewModel: MainViewModel,
+    resultViewModel: ResultsViewModel,
+    onSwitchScreen:() -> Unit
 ) {
     val appColors = LocalAppColors.current
 
-    var isExpanded by remember { mutableStateOf(false) }
-    val animDuration: Int = 800
+    val testResults by resultViewModel.resulterState.collectAsState()
+    val resultItems = testResults.allTestResults
 
+    val scrollState = rememberLazyListState()
+    var expandedCardIndex by remember { mutableStateOf<Int?>(null) }
+
+    LazyColumn(
+        state = scrollState,
+        modifier = Modifier
+            .fillMaxSize()
+            .background(color = appColors.standardBackground)
+            .padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+
+        itemsIndexed(resultItems) { index, result ->
+            val cardNumber = resultItems.size - index
+
+            ResultCard(
+                testResult = result,
+                cardNumber = cardNumber,
+                isExpanded = cardNumber == expandedCardIndex,
+                onExpandToggle = {
+                    expandedCardIndex = if (expandedCardIndex == cardNumber) null else cardNumber
+                },
+                onOpened = onSwitchScreen
+            )
+        }
+    }
+}
+
+@Composable
+fun ResultDescription(
+    mainViewModel: MainViewModel,
+    resultViewModel: ResultsViewModel,
+    onSwitchScreen:() -> Unit
+) {
+    val appColors = LocalAppColors.current
+
+    val testResults by resultViewModel.resulterState.collectAsState()
+    val resultItems = testResults.allTestResults.flatMap { it.testResults }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(color = appColors.standardBackground)
+    ) {
+        val scrollState = rememberLazyListState()
+
+        LazyColumn(
+            state = scrollState,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            itemsIndexed(resultItems) { index, result ->
+                ResultQuestionCard(
+                    questionIndex = index,
+                    questionItem = result
+                )
+            }
+        }
+
+        IconButton(
+
+        ) {
+            onSwitchScreen()
+        }
+    }
+
+}
+
+@Composable
+fun ResultCard(
+    testResult: TestResult,
+    cardNumber: Int,
+    isExpanded: Boolean,
+    onExpandToggle: () -> Unit,
+    onOpened: () -> Unit
+) {
+    val appColors = LocalAppColors.current
+    val animDuration: Int = 400
 
     Card(
         modifier = Modifier
@@ -131,13 +212,13 @@ fun ResultCard(
             testResult,
             cardNumber,
             isExpanded,
-            onExpandToggle = { isExpanded = !isExpanded }
+            onExpandToggle = onExpandToggle
         )
 
         AnimatedVisibility(
             visible = isExpanded,
             enter = expandVertically(
-                animationSpec = tween(durationMillis = animDuration) // длительность раскрытия
+                animationSpec = tween(durationMillis = animDuration)
             ),
             exit = shrinkVertically(
                 animationSpec = tween(durationMillis = animDuration)
@@ -160,9 +241,15 @@ fun ResultCard(
                     modifier = itemModifier
                 )
 
-                TestInfoTitle(modifier = itemModifier)
-
-                content()
+                ClassicButton(
+                    modifier = Modifier
+                        .fillMaxWidth(),
+                    label = "Список ответов",
+                    cornerRadius = 4.dp,
+                    onClickAction = {
+                        onOpened()
+                    }
+                )
             }
         }
 
@@ -183,35 +270,6 @@ fun ResultCard(
                     .background(appColors.thirdBackground)
             )
         }
-    }
-}
-
-@Composable
-fun WrongAnswer(
-    questionIndex: Int,
-    questionItem: QuestionModel
-){
-    QuestionCard(
-        questionIndex = questionIndex,
-        questionItem = questionItem
-    )
-}
-
-@Composable
-fun TestInfoTitle(
-    modifier: Modifier
-){
-    val appColors = LocalAppColors.current
-
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            "Список неправильных ответов",
-            style = MaterialTheme.typography.titleMedium,
-            color = appColors.black
-        )
     }
 }
 
